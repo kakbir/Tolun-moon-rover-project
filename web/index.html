@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tolun Kesif - Mission Control</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #0b0d11;
+            --panel-bg: #10131a;
+            --header-bg: #0c0e14;
+            --strip-bg: #0d0f15;
+            --border: #181d27;
+            --text-main: #b8bcc6;
+            --text-dim: #555d6e;
+            --text-label: #3d4455;
+            --accent-blue: #5580b8;
+            --accent-green: #5a9a6e;
+            --accent-yellow: #b89a50;
+            --accent-red: #a04040;
+            --accent-cyan: #5a8a9a;
+            --glow-green: rgba(90, 154, 110, 0.2);
+            --glow-red: rgba(160, 64, 64, 0.2);
+            --task-active-bg: #151a28;
+            --slide-width: 300px;
+            --ctrl-width: 230px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body, html {
+            height: 100%; width: 100%;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .app-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* === HEADER (40px) === */
+        .mc-header {
+            height: 40px;
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        .mc-header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .mc-logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--accent-cyan);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .mc-logo span {
+            color: var(--text-dim);
+            font-weight: 400;
+            font-size: 11px;
+            margin-left: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .mc-header-center {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .mc-utc {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--accent-green);
+            letter-spacing: 0.5px;
+        }
+
+        .mc-leds {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .mc-led {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-dim);
+        }
+
+        .mc-led-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #333;
+        }
+
+        .mc-led-dot.green {
+            background: var(--accent-green);
+            box-shadow: 0 0 6px var(--glow-green), 0 0 12px var(--glow-green);
+        }
+
+        .mc-header-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* === TELEMETRY STRIP (48px) === */
+        .telem-strip {
+            height: 48px;
+            background: var(--strip-bg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 0;
+            z-index: 100;
+            flex-shrink: 0;
+            overflow-x: auto;
+        }
+
+        .telem-item {
+            display: flex;
+            flex-direction: column;
+            padding: 0 16px;
+            border-right: 1px solid var(--border);
+            min-width: 110px;
+        }
+
+        .telem-item:last-child { border-right: none; }
+
+        .telem-label {
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--text-label);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+
+        .telem-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-main);
+            line-height: 1.2;
+        }
+
+        .telem-value.green { color: var(--accent-green); }
+        .telem-value.cyan { color: var(--accent-cyan); }
+        .telem-value.yellow { color: var(--accent-yellow); }
+
+        .telem-battery {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .telem-bat-bar { display: flex; gap: 2px; }
+
+        .telem-bat-seg {
+            width: 8px;
+            height: 14px;
+            background: #1e2430;
+            border-radius: 1px;
+        }
+
+        .telem-bat-seg.fill { background: var(--accent-green); }
+
+        .telem-bat-pct {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        /* === MAIN CONTENT AREA === */
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* === LEFT CONTROLS (always visible) === */
+        .ctrl-sidebar {
+            width: var(--ctrl-width);
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .ctrl-section {
+            padding: 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .ctrl-section-title {
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--text-label);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Mission action buttons - prominent */
+        .mission-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #startExplorationBtn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-green);
+            border: none;
+            color: #000;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.15s;
+            box-shadow: 0 0 8px var(--glow-green);
+        }
+
+        #startExplorationBtn:hover {
+            filter: brightness(1.15);
+            box-shadow: 0 0 14px var(--glow-green);
+        }
+
+        #startExplorationBtn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+
+        #stopExplorationBtn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-red);
+            border: none;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: none;
+            transition: all 0.15s;
+            box-shadow: 0 0 8px var(--glow-red);
+        }
+
+        #stopExplorationBtn:hover {
+            filter: brightness(1.15);
+            box-shadow: 0 0 14px var(--glow-red);
+        }
+
+        /* Time multiplier buttons */
+        .time-btns {
+            display: flex;
+            gap: 6px;
+        }
+
+        .time-btn {
+            flex: 1;
+            padding: 8px 0;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+
+        .time-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--text-main);
+        }
+
+        .time-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #fff;
+            box-shadow: 0 0 8px rgba(85, 128, 184, 0.3);
+        }
+
+        /* Target inputs */
+        .target-inputs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .target-field { flex: 1; }
+
+        .target-field label {
+            font-size: 9px;
+            color: var(--text-dim);
+            display: block;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .target-field input {
+            width: 100%;
+            padding: 5px 6px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            border-radius: 3px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .target-field input:focus { border-color: var(--accent-blue); }
+
+        #setTargetBtn {
+            width: 100%;
+            padding: 7px;
+            background: var(--accent-blue);
+            border: none;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background 0.15s;
+        }
+
+        #setTargetBtn:hover { background: #2563eb; }
+
+        /* Graphical gauges */
+        .gauge-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .gauge-item {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .gauge-label {
+            font-size: 9px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .gauge-bar-wrap {
+            height: 6px;
+            background: #141820;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .gauge-bar {
+            height: 100%;
+            background: var(--accent-cyan);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            min-width: 0;
+        }
+
+        .gauge-bar.throttle { background: var(--accent-blue); }
+        .gauge-bar.dist { background: var(--accent-green); }
+        .gauge-bar.slope { background: var(--accent-yellow); }
+
+        .gauge-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        /* Hidden task list (rendered by JS but not shown in sidebar) */
+        #taskList { display: none; }
+
+        /* === MAP VIEWPORT === */
+        .map-viewport {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #mapCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #000;
+            cursor: grab;
+        }
+
+        #mapCanvas:active { cursor: grabbing; }
+
+        /* Map overlay: target info */
+        .map-overlay-tl {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(10, 12, 18, 0.88);
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 50;
+            backdrop-filter: blur(8px);
+            min-width: 190px;
+        }
+
+        .map-overlay-tl .head-to-detail {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 3px;
+        }
+
+        .map-overlay-tl .head-to-detail span {
+            color: var(--accent-green);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .map-coords {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(10, 12, 18, 0.88);
+            padding: 6px 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            z-index: 50;
+            backdrop-filter: blur(8px);
+        }
+
+        #mapLogOverlay {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            width: 320px;
+            max-height: 140px;
+            background: rgba(10, 12, 18, 0.7);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 4px;
+            padding: 8px 10px;
+            font-size: 11px;
+            color: var(--text-dim);
+            z-index: 50;
+            overflow: hidden;
+            backdrop-filter: blur(6px);
+        }
+
+        #mapLogOverlay .log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+        }
+
+        #mapLogOverlay .log-entry:last-child { border-bottom: none; }
+        #mapLogOverlay .log-entry.highlight { color: var(--accent-green); }
+
+        #mapLogOverlay .log-time {
+            opacity: 0.4;
+            font-size: 9px;
+            margin-left: 8px;
+            white-space: nowrap;
+        }
+
+        /* === FLOATING 3D CAMERA PANEL (inside map) === */
+        .cam-panel {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            width: 420px;
+            height: 300px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            z-index: 60;
+            overflow: visible;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            min-width: 200px;
+            min-height: 140px;
+        }
+
+        .cam-panel-header {
+            height: 28px;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            cursor: grab;
+            flex-shrink: 0;
+            user-select: none;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .cam-panel-header:active { cursor: grabbing; }
+
+        .cam-panel-title {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cam-panel-title .rec-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-red);
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .cam-panel-actions { display: flex; gap: 4px; }
+
+        .cam-panel-btn {
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-dim);
+            font-size: 11px;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+            transition: all 0.15s;
+        }
+
+        .cam-panel-btn:hover {
+            color: var(--text-main);
+            background: rgba(255,255,255,0.06);
+            border-color: var(--border);
+        }
+
+        .cam-panel-body {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            border-radius: 0 0 6px 6px;
+        }
+
+        #frontCamera {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .cam-compass {
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cam-compass-deg { color: var(--accent-green); font-weight: 700; }
+        .cam-compass-label { color: var(--text-dim); font-size: 8px; text-transform: uppercase; }
+
+        /* Resize handle (bottom-right corner) */
+        .cam-resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 18px;
+            height: 18px;
+            cursor: nwse-resize;
+            z-index: 5;
+        }
+
+        .cam-resize-handle::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid var(--text-dim);
+            border-bottom: 2px solid var(--text-dim);
+            opacity: 0.5;
+        }
+
+        .cam-panel:hover .cam-resize-handle::after { opacity: 0.8; }
+
+        /* Camera fullscreen */
+        .cam-panel.fullscreen {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            bottom: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 0;
+            border: none;
+            z-index: 90;
+        }
+
+        .cam-panel.fullscreen .cam-resize-handle { display: none; }
+
+        /* Camera minimized */
+        .cam-panel.minimized { height: 28px !important; }
+        .cam-panel.minimized .cam-panel-body { display: none; }
+        .cam-panel.minimized .cam-resize-handle { display: none; }
+
+        .task-list { margin: 0; }
+
+        .task-item {
+            padding: 7px 0;
+            display: flex;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-dim);
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .task-item.active { color: var(--text-main); }
+
+        .task-item .check-box {
+            width: 12px;
+            height: 12px;
+            border: 1px solid var(--text-dim);
+            border-radius: 2px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* === OVERLAYS === */
+        .loading {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 12, 18, 0.98);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #1e2430;
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #calcOverlay {
+            position: fixed; inset: 0;
+            background: rgba(10, 12, 18, 0.92);
+            display: none; align-items: center; justify-content: center;
+            z-index: 9998; backdrop-filter: blur(6px);
+        }
+
+        #calcOverlay .calc-content { text-align: center; }
+
+        #calcOverlay .calc-spinner {
+            width: 50px; height: 50px;
+            border: 3px solid #1e2430; border-top-color: var(--accent-blue);
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        #calcOverlay .calc-message { font-size: 16px; font-weight: 600; color: var(--text-main); margin-bottom: 6px; }
+        #calcOverlay .calc-sub { font-size: 12px; color: var(--text-dim); }
+
+        #arrivalOverlay {
+            position: fixed; inset: 0;
+            background: rgba(10, 12, 18, 0.85);
+            display: none; align-items: center; justify-content: center;
+            z-index: 9997; backdrop-filter: blur(6px);
+        }
+
+        #arrivalOverlay .arrival-content { text-align: center; }
+        #arrivalOverlay .arrival-icon { font-size: 48px; margin-bottom: 16px; }
+        #arrivalOverlay .arrival-title { font-size: 22px; font-weight: 700; color: var(--accent-green); margin-bottom: 8px; }
+        #arrivalOverlay .arrival-sub { font-size: 13px; color: var(--text-dim); }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e2430; border-radius: 4px; }
+
+        /* === Obstacle Alert === */
+        #obstacleAlert {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9996;
+            animation: alertSlideIn 0.3s ease-out;
+        }
+
+        @keyframes alertSlideIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        .obstacle-alert-content {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: rgba(180, 50, 30, 0.92);
+            border: 1px solid rgba(255, 80, 50, 0.6);
+            padding: 14px 22px;
+            border-radius: 8px;
+            box-shadow: 0 4px 24px rgba(200, 40, 20, 0.4);
+            backdrop-filter: blur(8px);
+        }
+
+        .obstacle-alert-icon {
+            font-size: 22px;
+            color: #ffcc00;
+            animation: alertPulse 0.8s ease-in-out infinite;
+        }
+
+        @keyframes alertPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .obstacle-alert-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+
+        .obstacle-alert-sub {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 2px;
+        }
+
+        .obstacle-alert-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: #ffcc00;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
+        /* === DEM Loading Overlay (on map) === */
+        #demLoadingOverlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(5, 8, 14, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 80;
+            backdrop-filter: blur(4px);
+        }
+
+        .dem-loading-content {
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .dem-loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #1e2430;
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .dem-loading-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .dem-loading-sub {
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        /* === Exploration Panel === */
+        .explored-points-list {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .explored-points-list .empty-msg {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        .explored-point-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 6px;
+            border-radius: 3px;
+        }
+
+        .explored-point-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .explored-point-name {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .explored-point-coords {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: var(--text-dim);
+        }
+
+        #missionPhaseDisplay {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--accent-cyan);
+            margin-bottom: 8px;
+            padding: 4px 0;
+        }
+
+        #exploredCountBadge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--accent-green);
+            background: rgba(90, 154, 110, 0.15);
+            padding: 1px 6px;
+            border-radius: 8px;
+            margin-left: 6px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+
+    <!-- HEADER -->
+    <header class="mc-header">
+        <div class="mc-header-left">
+            <div class="mc-logo">TOLUN MISSION CTRL <span>v2.0</span></div>
+        </div>
+        <div class="mc-header-center">
+            <div class="mc-utc" id="timestamp">Loading...</div>
+            <div class="mc-leds">
+                <div class="mc-led"><div class="mc-led-dot green"></div>LINK</div>
+                <div class="mc-led"><div class="mc-led-dot green"></div>NAV</div>
+                <div class="mc-led"><div class="mc-led-dot green"></div>PWR</div>
+            </div>
+        </div>
+        <div class="mc-header-right">
+            <span style="font-size: 10px; color: var(--text-dim); letter-spacing: 0.5px;">SPACE: Start/Pause &nbsp; F: Camera</span>
+        </div>
+    </header>
+
+    <!-- TELEMETRY STRIP -->
+    <div class="telem-strip">
+        <div class="telem-item">
+            <div class="telem-label">Speed</div>
+            <div class="telem-value cyan" id="currentVel">0.0</div>
+        </div>
+        <div class="telem-item">
+            <div class="telem-label">Traveled</div>
+            <div class="telem-value" id="traveledDist">0 m</div>
+        </div>
+        <div class="telem-item">
+            <div class="telem-label">To Target</div>
+            <div class="telem-value yellow" id="toTarget">0 m</div>
+        </div>
+        <div class="telem-item">
+            <div class="telem-label">ETA</div>
+            <div class="telem-value" id="timeToTarget">--</div>
+        </div>
+        <div class="telem-item">
+            <div class="telem-label">Power</div>
+            <div class="telem-value green" id="powerWatts">3113 W</div>
+        </div>
+        <div class="telem-item">
+            <div class="telem-label">Battery</div>
+            <div class="telem-battery">
+                <div class="telem-bat-bar" id="batteryBar">
+                    <div class="telem-bat-seg fill"></div>
+                    <div class="telem-bat-seg fill"></div>
+                    <div class="telem-bat-seg fill"></div>
+                    <div class="telem-bat-seg fill"></div>
+                    <div class="telem-bat-seg"></div>
+                </div>
+                <span class="telem-bat-pct" id="batteryPercent">100%</span>
+            </div>
+        </div>
+        <div class="telem-item">
+            <div class="telem-label">Heading</div>
+            <div class="telem-value cyan" id="compassDegree">0&deg;</div>
+        </div>
+        <div class="telem-item">
+            <div class="telem-label">Distance</div>
+            <div class="telem-value" id="totalDist">0 km</div>
+        </div>
+        <div class="telem-item">
+            <div class="telem-label">Phase</div>
+            <div class="telem-value cyan" id="telemPhase">IDLE</div>
+        </div>
+        <div class="telem-item">
+            <div class="telem-label">Explored</div>
+            <div class="telem-value green" id="telemExplored">0</div>
+        </div>
+    </div>
+
+    <!-- MAIN: Controls sidebar + Map -->
+    <div class="main-content">
+
+        <!-- LEFT SIDEBAR: Always visible controls -->
+        <div class="ctrl-sidebar">
+            <div class="ctrl-section">
+                <div class="ctrl-section-title">Mission</div>
+                <div class="mission-btns">
+                    <button id="startExplorationBtn">Gorevi Baslat</button>
+                    <button id="stopExplorationBtn">Kesfi Durdur</button>
+                </div>
+            </div>
+            <div class="ctrl-section">
+                <div class="ctrl-section-title">Telemetry</div>
+                <div class="gauge-group">
+                    <div class="gauge-item">
+                        <div class="gauge-label">Velocity</div>
+                        <div class="gauge-bar-wrap">
+                            <div class="gauge-bar" id="gaugeVelocity" style="width: 0%"></div>
+                        </div>
+                        <div class="gauge-val" id="gaugeVelText">0.000 m/s</div>
+                    </div>
+                    <div class="gauge-item">
+                        <div class="gauge-label">Throttle</div>
+                        <div class="gauge-bar-wrap">
+                            <div class="gauge-bar throttle" id="gaugeThrottle" style="width: 33%"></div>
+                        </div>
+                        <div class="gauge-val" id="gaugeThrottleText">33%</div>
+                    </div>
+                    <div class="gauge-item">
+                        <div class="gauge-label">Distance</div>
+                        <div class="gauge-bar-wrap">
+                            <div class="gauge-bar dist" id="gaugeDist" style="width: 0%"></div>
+                        </div>
+                        <div class="gauge-val" id="gaugeDistText">0 / 0 m</div>
+                    </div>
+                    <div class="gauge-item">
+                        <div class="gauge-label">Slope</div>
+                        <div class="gauge-bar-wrap">
+                            <div class="gauge-bar slope" id="gaugeSlope" style="width: 50%"></div>
+                        </div>
+                        <div class="gauge-val" id="gaugeSlopeText">0.0&deg;</div>
+                    </div>
+                </div>
+            </div>
+            <div class="ctrl-section">
+                <div class="ctrl-section-title">Time Acceleration</div>
+                <div class="time-btns">
+                    <button class="time-btn active" data-mult="1">1x</button>
+                    <button class="time-btn" data-mult="2">2x</button>
+                    <button class="time-btn" data-mult="5">5x</button>
+                    <button class="time-btn" data-mult="10">10x</button>
+                </div>
+            </div>
+            <div class="ctrl-section">
+                <div class="ctrl-section-title">Target Coordinates</div>
+                <div class="target-inputs">
+                    <div class="target-field">
+                        <label>X (Lon)</label>
+                        <input type="number" id="targetX" value="0" step="0.5">
+                    </div>
+                    <div class="target-field">
+                        <label>Z (Lat)</label>
+                        <input type="number" id="targetZ" value="2" step="0.5">
+                    </div>
+                </div>
+                <button id="setTargetBtn">SET TARGET</button>
+            </div>
+            <div class="ctrl-section" id="explorationSection">
+                <div class="ctrl-section-title">
+                    <span>Discovered Locations</span>
+                    <span id="exploredCountBadge">0</span>
+                </div>
+                <div id="missionPhaseDisplay">Beklemede</div>
+                <div id="exploredPointsList" class="explored-points-list">
+                    <div class="empty-msg">Henuz kesfedilen nokta yok</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAP VIEWPORT -->
+        <div class="map-viewport" id="mapViewport">
+            <canvas id="mapCanvas"></canvas>
+
+            <div class="map-overlay-tl">
+                <div>Head to: <span style="color: var(--accent-green); font-family: 'JetBrains Mono', monospace; font-weight: 600;" id="targetHeading">0 N, 0 E</span></div>
+                <div class="head-to-detail">Yon: <span id="targetBearing">--</span></div>
+                <div class="head-to-detail">Mesafe: <span id="targetDistLive">--</span></div>
+                <div class="head-to-detail">Hedef: <span id="targetCoordsDisplay">--</span></div>
+            </div>
+
+            <div class="map-coords" id="mapDistance">0.00</div>
+
+            <div id="mapLogOverlay"></div>
+
+            <!-- DEM Loading Overlay (on map) -->
+            <div id="demLoadingOverlay" style="display:none;">
+                <div class="dem-loading-content">
+                    <div class="dem-loading-spinner"></div>
+                    <div class="dem-loading-title" id="demLoadingTitle">DEM Yukseklik Verisi Aliniyor</div>
+                    <div class="dem-loading-sub" id="demLoadingSub">NASA LOLA veritabanindan yukseklik haritasi indiriliyor...</div>
+                </div>
+            </div>
+
+            <!-- Floating 3D Camera Panel -->
+            <div class="cam-panel" id="camPanel">
+                <div class="cam-panel-header" id="camPanelDrag">
+                    <div class="cam-panel-title">
+                        <div class="rec-dot"></div>
+                        3D Camera
+                    </div>
+                    <div class="cam-panel-actions">
+                        <button class="cam-panel-btn" id="camMinBtn" title="Minimize"><i class="fas fa-minus"></i></button>
+                        <button class="cam-panel-btn" id="camFullBtn" title="Fullscreen (F)"><i class="fas fa-expand"></i></button>
+                    </div>
+                </div>
+                <div class="cam-panel-body">
+                    <canvas id="frontCamera"></canvas>
+                    <div class="cam-compass">
+                        <span class="cam-compass-deg" id="camCompassDeg">0&deg;</span>
+                        <span class="cam-compass-label">3D View</span>
+                    </div>
+                </div>
+                <div class="cam-resize-handle" id="camResizeHandle"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading" id="loading">
+    <div style="text-align: center;">
+        <div class="spinner"></div>
+        <p style="color: var(--text-dim); margin-top: 16px; font-size: 12px; letter-spacing: 0.5px;">Loading lunar satellite data...</p>
+    </div>
+</div>
+
+<!-- Calculation Overlay -->
+<div id="calcOverlay">
+    <div class="calc-content">
+        <div class="calc-spinner"></div>
+        <div class="calc-message" id="calcMessage">Rota hesaplaniyor...</div>
+        <div class="calc-sub" id="calcSub">Lutfen bekleyin</div>
+    </div>
+</div>
+
+<!-- Obstacle Alert (on map) -->
+<div id="obstacleAlert" style="display:none;">
+    <div class="obstacle-alert-content">
+        <div class="obstacle-alert-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <div class="obstacle-alert-text">
+            <div class="obstacle-alert-title">ENGEL TESPIT EDILDI</div>
+            <div class="obstacle-alert-sub">On kamera ile engel goruldu, alternatif rota hesaplaniyor...</div>
+        </div>
+        <div class="obstacle-alert-badge">#<span id="obstacleAlertCount">1</span></div>
+    </div>
+</div>
+
+<!-- Arrival Overlay -->
+<div id="arrivalOverlay">
+    <div class="arrival-content">
+        <div class="arrival-icon">&#127761;</div>
+        <div class="arrival-title">Hedefe ulasildi!</div>
+        <div class="arrival-sub" id="arrivalSub">Yeni hedef seciliyor...</div>
+    </div>
+</div>
+
+<div id="taskList" style="display:none"></div>
+<script src="app-wmts.js"></script>
+
+</body>
+</html>
